@@ -73,5 +73,12 @@ app.use("/api/messages", messageRouter);
 // Connect to MONGODB
 await connectDB();
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log("Server is running on PORT:" + PORT));
+// Traditional hosts like Render need the process to bind to PORT.
+// Skip listen() only for Vercel's serverless runtime, which imports this file.
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => console.log("Server is running on PORT:" + PORT));
+}
+
+// Export server for Vercel
+export default server;
