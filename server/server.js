@@ -11,10 +11,11 @@ import jwt from "jsonwebtoken";
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
+const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
 // Initialize socket.io server
 export const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { origin: clientUrl, credentials: true }
 });
 
 
@@ -57,7 +58,12 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: "4mb" }));
-app.use(cors());
+app.use(
+  cors({
+    origin: clientUrl,
+    credentials: true,
+  }),
+);
 
 // Route setup
 app.use("/api/status", (req, res) => res.send("Server is live."));

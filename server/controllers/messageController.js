@@ -12,7 +12,7 @@ export const getUserForSidebar = async (req, res) => {
     );
 
     // Count number of messages not seen
-    const unseenMessage = {};
+    const unseenMessages = {};
     const promises = filteredUsers.map(async (user) => {
       const messages = await Message.find({
         senderId: user._id,
@@ -21,15 +21,15 @@ export const getUserForSidebar = async (req, res) => {
       });
 
       if (messages.length > 0) {
-        unseenMessage[user._id] = messages.length;
+        unseenMessages[user._id] = messages.length;
       }
     });
 
     await Promise.all(promises);
-    res.json({ success: true, users: filteredUsers, unseenMessage });
+    res.json({ success: true, users: filteredUsers, unseenMessages });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -49,16 +49,16 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: selectedUserId },
         { senderId: selectedUserId, receiverId: myId },
       ],
-    });
+    }).sort({ createdAt: 1 });
 
     await Message.updateMany(
       { senderId: selectedUserId, receiverId: myId },
       { seen: true },
     );
-    res.json({ success: true, message: error.message });
+    res.json({ success: true, messages });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -81,7 +81,7 @@ export const markMessageAsSeen = async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -124,6 +124,6 @@ export const sendMessage = async (req, res) => {
     res.json({ success: true, newMessage });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
