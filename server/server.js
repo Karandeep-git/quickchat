@@ -11,11 +11,42 @@ import jwt from "jsonwebtoken";
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
-const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+
+const defaultAllowedOrigins = [
+  "http://localhost:5173",
+  "https://quickchat-rosy.vercel.app",
+];
+
+const allowedOrigins = [
+  ...new Set(
+    [
+      process.env.CLIENT_URL,
+      process.env.CLIENT_URLS,
+      ...defaultAllowedOrigins,
+    ]
+      .filter(Boolean)
+      .flatMap((value) => value.split(","))
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ),
+];
+
+const isAllowedOrigin = (origin) => !origin || allowedOrigins.includes(origin);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+  },
+  credentials: true,
+};
 
 // Initialize socket.io server
 export const io = new Server(server, {
-    cors: { origin: clientUrl, credentials: true }
+    cors: corsOptions
 });
 
 
@@ -58,12 +89,7 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: "4mb" }));
-app.use(
-  cors({
-    origin: clientUrl,
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
 
 // Route setup
 app.use("/api/status", (req, res) => res.send("Server is live."));
