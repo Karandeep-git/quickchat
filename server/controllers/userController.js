@@ -89,19 +89,21 @@ export const updateProfile = async (req, res) => {
     let updatedUser;
 
     if (!profilePic) {
-      updatedUser = await User.findByIdAndUpdate(
+      await User.findByIdAndUpdate(
         userId,
         { bio, fullName },
         { returnDocument: "after" },
       );
     } else {
       const upload = await cloudinary.uploader.upload(profilePic);
-      updatedUser = await User.findByIdAndUpdate(
+      await User.findByIdAndUpdate(
         userId,
         { profilePic: upload.secure_url, bio, fullName },
         { returnDocument: "after" },
       );
     }
+
+    updatedUser = await User.findById(userId).select("-password");
 
     res.json({ success: true, user: updatedUser });
   } catch (error) {
