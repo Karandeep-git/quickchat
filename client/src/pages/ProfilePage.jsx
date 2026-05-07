@@ -1,13 +1,14 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import assets from "../assets/assets";
+import BrandMark from "../components/BrandMark";
 import { AuthContext } from "../../context/AuthContext";
 
 const ProfilePage = () => {
   const { authUser, updateProfile } = useContext(AuthContext);
-
-  const [selectedImg, setSelectedImg] = useState(null);
   const navigate = useNavigate();
+
+  const [selectedImage, setSelectedImage] = useState(null);
   const [name, setName] = useState(authUser?.fullName || "");
   const [bio, setBio] = useState(authUser?.bio || "");
 
@@ -17,22 +18,34 @@ const ProfilePage = () => {
     }
   }, [authUser, navigate]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const previewImage = useMemo(
+    () =>
+      selectedImage
+        ? URL.createObjectURL(selectedImage)
+        : authUser?.profilePic || assets.avatar_icon,
+    [authUser?.profilePic, selectedImage],
+  );
 
-    if (!selectedImg) {
-      await updateProfile({ fullName: name, bio });
-      navigate("/");
-      return;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    let encodedImage = "";
+
+    if (selectedImage) {
+      encodedImage = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(selectedImage);
+      });
     }
 
-    const reader = new FileReader();
-    reader.readAsDataURL(selectedImg);
-    reader.onload = async () => {
-      const base64Image = reader.result;
-      await updateProfile({ profilePic: base64Image, fullName: name, bio });
-      navigate("/");
-    };
+    await updateProfile({
+      fullName: name,
+      bio,
+      profilePic: encodedImage || undefined,
+    });
+
+    navigate("/");
   };
 
   if (!authUser) {
@@ -40,63 +53,149 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-cover bg-no-repeat flex items-center justify-center">
-      <div className="w-5/6 max-w-2xl backdrop-blur-2xl text-gray-300 border-2 border-gray-600 flex items-center justify-between max-sm:flex-col-reverse rounded-lg">
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-5 p-10 flex-1"
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div
+        className="grid w-full max-w-4xl overflow-hidden rounded-[28px] border shadow-[0_18px_60px_var(--shadow-color)] lg:grid-cols-[0.95fr_1.05fr]"
+        style={{
+          background: "var(--panel-bg)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <section
+          className="border-b p-8 lg:border-b-0 lg:border-r"
+          style={{
+            background: "var(--panel-subtle)",
+            borderColor: "var(--border-color)",
+          }}
         >
-          <h3 className="text-lg">Profile details</h3>
-          <label
-            htmlFor="avatar"
-            className="flex items-center gap-3 cursor-pointer"
+          <BrandMark compact />
+          <p
+            className="mt-3 text-sm"
+            style={{ color: "var(--text-secondary)" }}
           >
-            <input
-              onChange={(e) => setSelectedImg(e.target.files[0])}
-              type="file"
-              id="avatar"
-              accept=".png, .jpg, .jpeg"
-              hidden
-            />
+            Keep your profile updated so your chats stay personal and clear.
+          </p>
+
+          <div
+            className="mt-8 rounded-[24px] p-5"
+            style={{ background: "var(--panel-muted)" }}
+          >
             <img
-              src={
-                selectedImg
-                  ? URL.createObjectURL(selectedImg)
-                  : assets.avatar_icon
-              }
-              alt=""
-              className={`w-12 h-12 ${selectedImg && "rounded-full"}`}
+              src={previewImage}
+              alt={authUser.fullName}
+              className="h-28 w-28 rounded-full object-cover"
             />
-            upload profile image
-          </label>
-          <input
-            onChange={(e) => setName(e.target.value)}
-            value={name}
-            type="text"
-            required
-            placeholder="Your name"
-            className="p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500"
-          />
-          <textarea
-            onChange={(e) => setBio(e.target.value)}
-            value={bio}
-            placeholder="Write profile bio"
-            required
-            className="p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500"
-            rows={4}
-          ></textarea>
-          <button
-            type="submit"
-            className="bg-linear-to-r from-purple-400 to-violet-600 text-white p-2 rounded-full text-lg cursor-pointer"
-          >
-            Save
-          </button>
-        </form>
-        <img
-          src={authUser?.profilePic || assets.logo_icon}
-          className={`max-w-44 aspect-square rounded-full mx-10 max-sm:mt-10 ${selectedImg && "rounded-full"}`}
-          alt=""
-        />
+            <h2
+              className="mt-4 text-2xl font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {name || authUser.fullName}
+            </h2>
+            <p
+              className="mt-2 text-sm leading-6"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {bio || "Add a short bio to introduce yourself in conversations."}
+            </p>
+          </div>
+        </section>
+
+        <section className="p-6 sm:p-8">
+          <form onSubmit={handleSubmit}>
+            <div className="flex items-center justify-between gap-4">
+              <h3
+                className="text-2xl font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Edit profile
+              </h3>
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="rounded-full px-4 py-2 text-sm"
+                style={{
+                  background: "var(--panel-muted)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                Back
+              </button>
+            </div>
+
+            <label
+              className="mt-7 flex cursor-pointer items-center gap-4 rounded-[24px] border p-4"
+              style={{
+                background: "var(--panel-subtle)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg"
+                hidden
+                onChange={(event) =>
+                  setSelectedImage(event.target.files?.[0] || null)
+                }
+              />
+              <img
+                src={previewImage}
+                alt="Profile preview"
+                className="h-16 w-16 rounded-full object-cover"
+              />
+              <div>
+                <p
+                  className="font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Upload profile image
+                </p>
+                <p
+                  className="mt-1 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  PNG or JPG works best.
+                </p>
+              </div>
+            </label>
+
+            <div className="mt-6 space-y-4">
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                type="text"
+                placeholder="Your full name"
+                required
+                className="w-full rounded-2xl border px-4 py-3 outline-none"
+                style={{
+                  background: "var(--input-bg)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              <textarea
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                placeholder="Write a short bio"
+                required
+                rows={5}
+                className="w-full rounded-2xl border px-4 py-3 outline-none"
+                style={{
+                  background: "var(--input-bg)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              ></textarea>
+            </div>
+
+            <button
+              type="submit"
+              className="mt-6 rounded-full px-5 py-3 font-medium text-white"
+              style={{ background: "var(--accent)" }}
+            >
+              Save changes
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   );
