@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import assets from "../assets/assets";
+import BrandMark from "../components/BrandMark";
 import { AuthContext } from "../../context/AuthContext";
 
 const LoginPage = () => {
@@ -9,11 +9,16 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [bio, setBio] = useState("");
   const [isDataSubmitted, setIsDataSubmitted] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(true);
 
   const { login } = useContext(AuthContext);
 
   const onSubmitHandler = (event) => {
     event.preventDefault();
+
+    if (!acceptedTerms) {
+      return;
+    }
 
     if (currentState === "Sign up" && !isDataSubmitted) {
       setIsDataSubmitted(true);
@@ -29,100 +34,173 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl">
-      {/* Left */}
-      <img src={assets.logo_big} alt="" className="w-[min(30vw,250px)]" />
-
-      {/* Right */}
-      <form
-        onSubmit={onSubmitHandler}
-        className="border-2 bg-white/8 text-white border-gray-500 p-6 flex flex-col gap-6 rounded-lg shadow-lg"
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div
+        className="w-full max-w-md rounded-[28px] border p-7 shadow-[0_18px_60px_var(--shadow-color)] sm:p-8"
+        style={{
+          background: "var(--panel-bg)",
+          borderColor: "var(--border-color)",
+        }}
       >
-        <h2 className="font-medium text-2xl flex justify-between items-center">
-          {currentState}
-          {isDataSubmitted && (
-            <img
-              onClick={() => setIsDataSubmitted(false)}
-              src={assets.arrow_icon}
-              alt=""
-              className="w-5 cursor-pointer"
-            />
-          )}
-        </h2>
-        {currentState === "Sign up" && !isDataSubmitted && (
-          <input
-            onChange={(e) => setFullName(e.target.value)}
-            value={fullName}
-            type="text"
-            className="p-2 border border-gray-500 rounded-md focus:outline-none"
-            placeholder="Full Name"
-            required
-          />
-        )}
-        {!isDataSubmitted && (
-          <>
-            <input
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder="Email address"
-              required
-              className="p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <input
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              placeholder="Password"
-              required
-              className="p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </>
-        )}
-        {currentState === "Sign up" && isDataSubmitted && (
-          <textarea
-            onChange={(e) => setBio(e.target.value)}
-            value={bio}
-            rows={4}
-            className="p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Provide a short bio..."
-          ></textarea>
-        )}
-        <button
-          type="submit"
-          className="py-3 bg-linear-to-r from-purple-400 to-violet-600 text-white rounded-md cursor-pointer"
-        >
-          {currentState === "Sign up" ? "Create Account" : "Login Now"}
-        </button>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <input type="checkbox" />
-          <p>Agree to the terms of use & privacy policy.</p>
+        <div className="mb-8 text-center">
+          <BrandMark />
+          <p
+            className="mt-3 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Sign in to continue your conversations.
+          </p>
         </div>
-        <div className="flex flex-col gap-2">
-          {currentState === "Sign up" ? (
-            <p className="text-sm text-gray-600">
-              Already have an account?{" "}
-              <span
-                onClick={() => {
-                  setCurrentState("Login");
-                  setIsDataSubmitted(false);
+
+        <form onSubmit={onSubmitHandler}>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <p
+                className="text-sm font-medium"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {currentState === "Sign up" ? "Create account" : "Login"}
+              </p>
+            </div>
+            {isDataSubmitted && (
+              <button
+                type="button"
+                onClick={() => setIsDataSubmitted(false)}
+                className="rounded-full px-3 py-1 text-sm"
+                style={{
+                  background: "var(--panel-muted)",
+                  color: "var(--text-primary)",
                 }}
-                className="font-medium text-violet-500 cursor-pointer"
               >
-                Login here
-              </span>
-            </p>
-          ) : (
-            <p className="text-sm text-gray-600">
-              Create an account{" "}
-              <span
-                onClick={() => setCurrentState("Sign up")}
-                className="font-medium text-violet-500 cursor-pointer"
-              >
-                Click here
-              </span>
-            </p>
-          )}
-        </div>
-      </form>
+                Back
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {currentState === "Sign up" && !isDataSubmitted && (
+              <input
+                onChange={(event) => setFullName(event.target.value)}
+                value={fullName}
+                type="text"
+                placeholder="Full name"
+                required
+                className="w-full rounded-2xl border px-4 py-3 outline-none"
+                style={{
+                  background: "var(--input-bg)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            )}
+
+            {!isDataSubmitted && (
+              <>
+                <input
+                  onChange={(event) => setEmail(event.target.value)}
+                  value={email}
+                  type="email"
+                  placeholder="Email address"
+                  required
+                  className="w-full rounded-2xl border px-4 py-3 outline-none"
+                  style={{
+                    background: "var(--input-bg)",
+                    borderColor: "var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <input
+                  onChange={(event) => setPassword(event.target.value)}
+                  value={password}
+                  type="password"
+                  placeholder="Password"
+                  required
+                  className="w-full rounded-2xl border px-4 py-3 outline-none"
+                  style={{
+                    background: "var(--input-bg)",
+                    borderColor: "var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </>
+            )}
+
+            {currentState === "Sign up" && isDataSubmitted && (
+              <textarea
+                onChange={(event) => setBio(event.target.value)}
+                value={bio}
+                rows={4}
+                placeholder="Short bio"
+                required
+                className="w-full rounded-2xl border px-4 py-3 outline-none"
+                style={{
+                  background: "var(--input-bg)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              ></textarea>
+            )}
+          </div>
+
+          <label
+            className="mt-4 flex items-center gap-3 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={() => setAcceptedTerms((prev) => !prev)}
+            />
+            I agree to the terms and privacy policy.
+          </label>
+
+          <button
+            type="submit"
+            className="mt-6 w-full rounded-full px-4 py-3 font-medium text-white"
+            style={{ background: "var(--accent)" }}
+          >
+            {currentState === "Sign up"
+              ? isDataSubmitted
+                ? "Create account"
+                : "Continue"
+              : "Login"}
+          </button>
+
+          <p
+            className="mt-5 text-center text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {currentState === "Sign up" ? (
+              <>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentState("Login");
+                    setIsDataSubmitted(false);
+                  }}
+                  className="font-medium"
+                  style={{ color: "var(--accent)" }}
+                >
+                  Login
+                </button>
+              </>
+            ) : (
+              <>
+                Need an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setCurrentState("Sign up")}
+                  className="font-medium"
+                  style={{ color: "var(--accent)" }}
+                >
+                  Sign up
+                </button>
+              </>
+            )}
+          </p>
+        </form>
+      </div>
     </div>
   );
 };

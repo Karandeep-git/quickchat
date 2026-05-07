@@ -1,164 +1,445 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import assets from "../assets/assets";
-import { formatMessageTime } from "../lib/utils";
+import BrandMark from "./BrandMark";
+import {
+  formatConversationDate,
+  formatMessageTime,
+  getConversationAvatar,
+  getConversationSubtitle,
+  getConversationTitle,
+} from "../lib/utils";
 import { ChatContext } from "../../context/ChatContext";
 import { AuthContext } from "../../context/AuthContext";
-import toast from "react-hot-toast";
 
 const ChatContainer = () => {
-  const { messages, selectedUser, setSelectedUser, sendMessage, getMessages } =
-    useContext(ChatContext);
+  const {
+    messages,
+    selectedConversation,
+    setSelectedConversation,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    typingUsers,
+    isFetchingMessages,
+    startTyping,
+    stopTyping,
+  } = useContext(ChatContext);
   const { authUser, onlineUsers } = useContext(AuthContext);
 
-  const scrollEnd = useRef();
-
+  const scrollEndRef = useRef(null);
   const [input, setInput] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [query, setQuery] = useState("");
 
-  // Handle sending a message
-  const handleSendMessage = async (e) => {
-    e?.preventDefault();
-    if (!selectedUser || input.trim() === "") return null;
+  const conversationTypingKey = selectedConversation?.id;
+  const isTyping = Boolean(typingUsers?.[conversationTypingKey]);
+
+  const filteredMessages = useMemo(() => {
+    if (!query.trim()) {
+      return messages;
+    }
+
+    return messages.filter((message) =>
+      `${message.text || ""}`.toLowerCase().includes(query.toLowerCase()),
+    );
+  }, [messages, query]);
+
+  const handleSendMessage = async (event) => {
+    event?.preventDefault();
+
+    if (!selectedConversation || input.trim() === "") {
+      return;
+    }
+
+    if (editingMessageId) {
+      await editMessage(editingMessageId, input.trim());
+      setEditingMessageId(null);
+      setInput("");
+      stopTyping();
+      return;
+    }
+
     await sendMessage({ text: input.trim() });
     setInput("");
+    stopTyping();
   };
 
-  // Handle sending an image
-  const handleSendImage = async (e) => {
-    const file = e.target.files[0];
+  const handleSendImage = async (event) => {
+    const file = event.target.files?.[0];
+
     if (!file || !file.type.startsWith("image/")) {
       toast.error("Select an image file");
       return;
     }
 
-    const reader = new FileReader();
+    const encodedImage = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
 
-    reader.onloadend = async () => {
-      await sendMessage({ image: reader.result });
-      e.target.value = "";
-    };
+    await sendMessage({ image: encodedImage });
+    event.target.value = "";
+  };
 
-    reader.readAsDataURL(file);
+  const handleInputChange = (event) => {
+    setInput(event.target.value);
+
+    if (!selectedConversation) {
+      return;
+    }
+
+    if (event.target.value.trim()) {
+      startTyping(selectedConversation);
+    } else {
+      stopTyping();
+    }
+  };
+
+  const handleEdit = (message) => {
+    setEditingMessageId(message._id);
+    setInput(message.text || "");
+  };
+
+  const getDeliveryStatus = (message) => {
+    if (selectedConversation?.type === "group") {
+      return message.editedAt ? "Edited" : "";
+    }
+
+    const senderId = String(message.senderId?._id || message.senderId);
+    if (senderId !== String(authUser?._id)) {
+      return message.editedAt ? "Edited" : "";
+    }
+
+    if (message.seen) {
+      return "Seen";
+    }
+
+    if (message.deliveredAt) {
+      return "Delivered";
+    }
+
+    return "Sent";
   };
 
   useEffect(() => {
-    if (selectedUser) {
-      getMessages(selectedUser._id);
+    if (scrollEndRef.current) {
+      scrollEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [selectedUser, getMessages]);
+  }, [filteredMessages, isTyping]);
 
-  useEffect(() => {
-    if (scrollEnd.current && messages) {
-      scrollEnd.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  return selectedUser ? (
-    <div className="h-full overflow-scroll relative backdrop-blur-lg">
-      {/* header */}
-      <div className="flex items-center gap-3 py-3 mx-4 border-b border-stone-500">
-        <img
-          src={selectedUser.profilePic || assets.avatar_icon}
-          alt=""
-          className="w-8 rounded-full"
-        />
-        <p className="flex-1 text-lg text-white flex items-center gap-2">
-          {selectedUser.fullName}
-          <span
-            className={`w-2 h-2 rounded-full ${onlineUsers.includes(selectedUser._id) ? "bg-green-500" : "bg-gray-500"}`}
-          ></span>
-        </p>
-        <img
-          onClick={() => setSelectedUser(null)}
-          src={assets.arrow_icon}
-          alt=""
-          className="md:hidden max-w-7"
-        />
-        <img src={assets.help_icon} alt="" className="max-md:hidden max-w-5" />
-      </div>
-
-      {/* chat area */}
-      <div className="flex flex-col h-[calc(100%-120px)] overflow-y-scroll p-3 pb-6">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`flex items-end gap-2 justify-end ${String(msg.senderId) !== String(authUser._id) && "flex-row-reverse"}`}
+  if (!selectedConversation) {
+    return (
+      <section
+        className="hidden h-full min-h-0 items-center justify-center border-r p-8 text-center lg:flex"
+        style={{
+          background: "var(--chat-bg)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <div className="max-w-md">
+          <BrandMark />
+          <p
+            className="mt-4 text-base"
+            style={{ color: "var(--text-secondary)" }}
           >
-            {msg.image ? (
-              <img
-                src={msg.image}
-                alt=""
-                className="max-w-57.5 border border-gray-700 rounded-lg overflow-hidden mb-8"
-              />
-            ) : (
-              <p
-                className={`p-2 max-w-50 md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${String(msg.senderId) === String(authUser._id) ? "rounded-br-none" : "rounded-bl-none"}`}
+            Select a conversation to start messaging.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  const isDirectConversation = selectedConversation.type === "direct";
+  const isConversationOnline =
+    isDirectConversation &&
+    onlineUsers.includes(String(selectedConversation.id));
+
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col"
+      style={{ background: "var(--chat-bg)" }}
+    >
+      <header
+        className="border-b px-4 py-4 md:px-6"
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setSelectedConversation(null)}
+            className="rounded-full px-3 py-2 text-sm lg:hidden"
+            style={{
+              background: "var(--panel-muted)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Back
+          </button>
+
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <img
+              src={getConversationAvatar(selectedConversation, assets.avatar_icon)}
+              alt={getConversationTitle(selectedConversation)}
+              className="h-11 w-11 rounded-full object-cover"
+            />
+            <div className="min-w-0">
+              <h2
+                className="truncate text-lg font-semibold"
+                style={{ color: "var(--text-primary)" }}
               >
-                {msg.text}
-              </p>
-            )}
-            <div className="text-center text-xs">
-              <img
-                src={
-                  String(msg.senderId) === String(authUser._id)
-                    ? authUser?.profilePic || assets.avatar_icon
-                    : selectedUser?.profilePic || assets.avatar_icon
-                }
-                alt=""
-                className="w-7 rounded-full"
-              />
-              <p className="text-gray-500">
-                {formatMessageTime(msg.createdAt)}
+                {getConversationTitle(selectedConversation)}
+              </h2>
+              <p
+                className="truncate text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {isTyping
+                  ? "Typing..."
+                  : isConversationOnline
+                    ? "Online"
+                    : getConversationSubtitle(selectedConversation)}
               </p>
             </div>
           </div>
-        ))}
-        <div ref={scrollEnd}></div>
+
+          <div
+            className="flex w-full items-center gap-2 rounded-2xl border px-3 py-2 md:w-72"
+            style={{
+              background: "var(--input-bg)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <img src={assets.search_icon} alt="" className="h-4 w-4" />
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search messages"
+              className="w-full bg-transparent text-sm outline-none"
+              style={{ color: "var(--text-primary)" }}
+            />
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6">
+        {isFetchingMessages ? (
+          <div
+            className="flex h-full items-center justify-center"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Loading messages...
+          </div>
+        ) : filteredMessages.length > 0 ? (
+          <div className="space-y-4">
+            {filteredMessages.map((message, index) => {
+              const senderId = String(message.senderId?._id || message.senderId);
+              const isMine = senderId === String(authUser?._id);
+              const showDateDivider =
+                index === 0 ||
+                new Date(filteredMessages[index - 1].createdAt).toDateString() !==
+                  new Date(message.createdAt).toDateString();
+
+              return (
+                <div key={message._id || `${message.createdAt}-${index}`}>
+                  {showDateDivider && (
+                    <div className="mb-4 flex justify-center">
+                      <span
+                        className="rounded-full px-4 py-1 text-xs"
+                        style={{
+                          background: "var(--panel-muted)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {formatConversationDate(message.createdAt)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    className={`flex items-end gap-3 ${isMine ? "justify-end" : "justify-start"}`}
+                  >
+                    {!isMine && (
+                      <img
+                        src={
+                          message.senderId?.profilePic ||
+                          getConversationAvatar(selectedConversation, assets.avatar_icon)
+                        }
+                        alt={
+                          message.senderId?.fullName ||
+                          getConversationTitle(selectedConversation)
+                        }
+                        className="hidden h-8 w-8 rounded-full object-cover sm:block"
+                      />
+                    )}
+
+                    <div
+                      className="max-w-[82%] rounded-[22px] px-4 py-3 shadow-sm md:max-w-[70%]"
+                      style={{
+                        background: isMine
+                          ? "var(--sender-bubble)"
+                          : "var(--receiver-bubble)",
+                        color: isMine
+                          ? "var(--sender-text)"
+                          : "var(--receiver-text)",
+                      }}
+                    >
+                      {selectedConversation.type === "group" && !isMine && (
+                        <p
+                          className="mb-2 text-xs font-medium"
+                          style={{ color: "var(--accent)" }}
+                        >
+                          {message.senderId?.fullName || "Teammate"}
+                        </p>
+                      )}
+
+                      {message.image && (
+                        <img
+                          src={message.image}
+                          alt="Shared attachment"
+                          className="mb-3 max-h-72 w-full rounded-2xl object-cover"
+                        />
+                      )}
+
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                        {message.text}
+                      </p>
+
+                      <div
+                        className="mt-3 flex items-center justify-between gap-4 text-[11px]"
+                        style={{
+                          color: isMine
+                            ? "rgba(255,255,255,0.82)"
+                            : "var(--text-secondary)",
+                        }}
+                      >
+                        <span>{formatMessageTime(message.createdAt)}</span>
+                        <div className="flex items-center gap-3">
+                          <span>{getDeliveryStatus(message)}</span>
+                          {isMine && !message.deletedForEveryone && (
+                            <>
+                              <button type="button" onClick={() => handleEdit(message)}>
+                                Edit
+                              </button>
+                              <button type="button" onClick={() => deleteMessage(message._id)}>
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {isTyping && (
+              <div
+                className="flex items-center gap-2 text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full"
+                  style={{ background: "var(--accent)" }}
+                ></span>
+                Typing...
+              </div>
+            )}
+
+            <div ref={scrollEndRef}></div>
+          </div>
+        ) : (
+          <div
+            className="flex h-full flex-col items-center justify-center text-center"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <p
+              className="text-2xl font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Start the conversation
+            </p>
+            <p className="mt-2 text-sm">Send a message to begin chatting.</p>
+          </div>
+        )}
       </div>
 
-      {/* bottom-area */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 p-3">
-        <div className="flex-1 flex items-center bg-gray-100/12 px-3 rounded-full">
-          <input
-            onChange={(e) => setInput(e.target.value)}
-            value={input}
-            onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
-            type="text"
-            placeholder="Send a message..."
-            className="flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder:text-gray-400"
-          />
-          <input
-            onChange={handleSendImage}
-            type="file"
-            id="image"
-            accept="image/png, image/jpeg"
-            hidden
-          />
-          <label htmlFor="image">
-            <img
-              src={assets.gallery_icon}
-              alt=""
-              className="w-5 mr-2 cursor-pointer"
+      <form
+        onSubmit={handleSendMessage}
+        className="border-t px-4 py-4 md:px-6"
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        {editingMessageId && (
+          <div
+            className="mb-3 flex items-center justify-between rounded-2xl px-4 py-3 text-sm"
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <p>Editing a message</p>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingMessageId(null);
+                setInput("");
+              }}
+              style={{ color: "var(--accent)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-3">
+          <label
+            className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-2xl"
+            style={{ background: "var(--panel-muted)" }}
+          >
+            <input
+              onChange={handleSendImage}
+              type="file"
+              accept="image/png, image/jpeg"
+              hidden
             />
+            <img src={assets.gallery_icon} alt="Upload" className="h-5 w-5" />
           </label>
+
+          <div
+            className="flex-1 rounded-[24px] border px-4 py-3"
+            style={{
+              background: "var(--input-bg)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <textarea
+              value={input}
+              onChange={handleInputChange}
+              onBlur={stopTyping}
+              rows={1}
+              placeholder={
+                selectedConversation.type === "group"
+                  ? "Message the group..."
+                  : "Write a message..."
+              }
+              className="max-h-32 min-h-[28px] w-full resize-none bg-transparent text-sm leading-6 outline-none"
+              style={{ color: "var(--text-primary)" }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white"
+            style={{ background: "var(--accent)" }}
+          >
+            <img src={assets.send_button} alt="Send" className="h-5 w-5" />
+          </button>
         </div>
-        <img
-          onClick={handleSendMessage}
-          src={assets.send_button}
-          alt="Send"
-          className="w-7 cursor-pointer"
-        />
-      </div>
-    </div>
-  ) : (
-    <div className="flex flex-col items-center justify-center gap-2 text-gray-500 bg-white/10 max-md:hidden">
-      <img
-        onClick={handleSendMessage}
-        src={assets.logo_icon}
-        className="max-w-16"
-        alt=""
-      />
-      <p className="text-lg font-medium text-white">Chat anytime, anywhere</p>
-    </div>
+      </form>
+    </section>
   );
 };
 
