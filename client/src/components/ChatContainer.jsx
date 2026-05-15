@@ -28,6 +28,7 @@ const ChatContainer = () => {
   const { authUser, onlineUsers } = useContext(AuthContext);
 
   const scrollEndRef = useRef(null);
+  const skipNextSubmitRef = useRef(false);
   const [input, setInput] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [query, setQuery] = useState("");
@@ -46,6 +47,12 @@ const ChatContainer = () => {
   }, [messages, query]);
 
   const handleSendMessage = async (event) => {
+    if (event?.type === "submit" && skipNextSubmitRef.current) {
+      skipNextSubmitRef.current = false;
+      event.preventDefault();
+      return;
+    }
+
     event?.preventDefault();
 
     if (!selectedConversation || input.trim() === "") {
@@ -95,6 +102,16 @@ const ChatContainer = () => {
     } else {
       stopTyping();
     }
+  };
+
+  const handleInputKeyDown = (event) => {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    skipNextSubmitRef.current = true;
+    handleSendMessage();
   };
 
   const handleEdit = (message) => {
@@ -418,6 +435,7 @@ const ChatContainer = () => {
             <textarea
               value={input}
               onChange={handleInputChange}
+              onKeyDown={handleInputKeyDown}
               onBlur={stopTyping}
               rows={1}
               placeholder={
